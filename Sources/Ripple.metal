@@ -40,8 +40,8 @@ fragment float4 liquid(Vertex v [[stage_in]],
             float width = (22 + age * 14) * scale;
             float q = distance / width;
             float envelope = exp(-q * q * 0.5f);
-            float life = smoothstep(0.0f, 0.02f, age) * (1 - smoothstep(0.12f, 0.75f, age));
-            float waveRadius = (14 + age * 120) * scale;
+            float life = smoothstep(0.0f, 0.02f, age) * (1 - smoothstep(0.20f, 1.2f, age));
+            float waveRadius = (14 + age * 140) * scale;
             float waveWidth = (12 + age * 8) * scale;
             float waveX = (distance - waveRadius) / waveWidth;
             float waveEnvelope = exp(-waveX * waveX * 0.5f);

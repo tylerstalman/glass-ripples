@@ -22,7 +22,7 @@ struct Ripple {
     let end: CGPoint
     let birth: Double
     let wake: Bool
-    var lifetime: Double { wake ? 0.75 : duration }
+    var lifetime: Double { wake ? 1.2 : duration }
 }
 
 final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate {
@@ -271,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "Glass Ripples")
         let menu = NSMenu()
-        let version = menu.addItem(withTitle: "Glass Ripples 0.4.1 · Touch & Drag", action: nil, keyEquivalent: "")
+        let version = menu.addItem(withTitle: "Glass Ripples 0.4.2 · Touch & Drag", action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(.separator())
         toggleItem = menu.addItem(withTitle: "Ripples Enabled   ⌃⌥⌘R", action: #selector(toggle), keyEquivalent: "")
@@ -384,7 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }, Unmanaged.passUnretained(self).toOpaque()) != 0 else {
                     throw AppError.message(String(cString: GRLastTouchError()))
                 }
-                NSLog("Glass Ripples 0.4.1: built-in touchscreen reader enabled")
+                NSLog("Glass Ripples 0.4.2: built-in touchscreen reader enabled")
                 loggedTouch = false
                 surfaces = ready
                 enabled = true
@@ -490,7 +490,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-let logURL = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("Launch.log")
+let logURL = FileManager.default.temporaryDirectory.appendingPathComponent("GlassRipples.log")
 if let log = fopen(logURL.path, "a") {
     dup2(fileno(log), STDERR_FILENO)
     fclose(log)
@@ -499,4 +499,6 @@ let app = NSApplication.shared
 let delegate = AppDelegate()
 app.setActivationPolicy(.accessory)
 app.delegate = delegate
-app.run()
+withExtendedLifetime(delegate) {
+    app.run()
+}
