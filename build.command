@@ -47,6 +47,7 @@ PLIST
 /usr/bin/codesign --verify --strict "$APP"
 if [[ -e "$DEST" ]]; then mv "$DEST" "$STAGE/previous.app"; fi
 mv "$APP" "$DEST"
+cp Sources/Ripple.metal "${TMPDIR:-/tmp/}GlassRipples-Ripple.metal"
 echo "Built: $DEST"
 if [[ "${1:-}" != "--no-open" ]]; then
     if ! /usr/bin/open "$DEST"; then

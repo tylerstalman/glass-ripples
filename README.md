@@ -42,7 +42,7 @@ Capture and drawing stop when effects expire. Movement emits at most 30 updates 
 
 A nonexclusive IOKit listener reads reports only from the built-in Apple Kiwi touchscreen. The decoder rejects calibration scans, finds separate fingertip patches, and matches them between frames. Sensor data and screen frames stay in memory. Nothing is transmitted.
 
-For visual adjustments, edit **Sources/Ripple.metal** beside the app and restart. The bundled shader is used if that file is absent.
+For visual adjustments, edit **Sources/Ripple.metal**, copy it to `"${TMPDIR}GlassRipples-Ripple.metal"`, and restart. The build script also refreshes this development override. The app uses its bundled shader when the override is absent or unreadable, so startup does not require access to Documents.
 
 ## Development
 

@@ -323,11 +323,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             throw AppError.message("Metal or the ripple shader is unavailable.")
         }
         self.device = device
-        // Keep shader iteration outside the signed bundle in this local build.
-        let editableShader = Bundle.main.bundleURL.deletingLastPathComponent()
-            .appendingPathComponent("Sources/Ripple.metal")
-        let shaderURL = FileManager.default.fileExists(atPath: editableShader.path) ? editableShader : url
-        let library = try device.makeLibrary(source: String(contentsOf: shaderURL, encoding: .utf8), options: nil)
+        // Development overrides live outside privacy-protected user folders.
+        let editableShader = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GlassRipples-Ripple.metal")
+        let overrideSource = try? String(contentsOf: editableShader, encoding: .utf8)
+        let source = try overrideSource ?? String(contentsOf: url, encoding: .utf8)
+        let library = try device.makeLibrary(source: source, options: nil)
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.vertexFunction = library.makeFunction(name: "fullscreen")
         descriptor.fragmentFunction = library.makeFunction(name: "liquid")
