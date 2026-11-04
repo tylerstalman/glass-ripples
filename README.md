@@ -23,7 +23,7 @@ The app is locally ad-hoc signed. Rebuilding can require removing the old Screen
 ## Use
 
 - Tap the built-in display for an expanding ripple.
-- Drag fingers to leave continuous refractive channels with spreading banks along their paths.
+- Drag fingers to leave smooth curved refractive channels with rounded ends and spreading banks. Small contact movements stay as tap ripples; deliberate movement gradually introduces the wake.
 - **Control–Option–Command–R** toggles the effect.
 - The water-waves menu includes a test ripple and Quit.
 - **Ripple Strength** offers Low, Medium, and High, adjusting wave size, refraction, opacity, highlights, and color intensity together. Low uses clearer, more contained waves with fewer bands and shorter travel.

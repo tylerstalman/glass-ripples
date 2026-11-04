@@ -29,40 +29,83 @@ fragment float4 liquid(Vertex v [[stage_in]],
     float wakeCoverage = 0;
     float2 wakeBend = 0;
     float wakeLight = 0;
+    float wakeWeight = 0;
     for (uint i = 0; i < uint(u.header.z); ++i) {
         float4 r = u.ripples[i].originAge;
         bool wake = r.w > 0.5f;
         float age = r.z;
         float2 origin = r.xy;
         if (wake) {
-            float2 segment = u.ripples[i].end.xy - origin;
-            float segmentLength = max(length(segment), 0.001f);
-            float2 tangent = segment / segmentLength;
+            float2 tip = u.ripples[i].end.xy;
+            // Ignore back-and-forth contact jitter: qualify by displacement
+            // from the initial contact, not accumulated path length.
+            float movement = distance(origin, tip);
+            float2 previousPoint = origin;
+            float previousAge = age;
+            for (uint step = 0; step < 24; ++step) {
+                bool found = false;
+                for (uint j = 0; j < uint(u.header.z); ++j) {
+                    Wave prior = u.ripples[j];
+                    if (prior.originAge.w > 0.5f
+                        && prior.originAge.z > previousAge
+                        && prior.originAge.z - previousAge < 0.12f
+                        && distance(prior.end.xy, previousPoint) < 0.1f) {
+                        movement = distance(prior.originAge.xy, tip);
+                        previousPoint = prior.originAge.xy;
+                        previousAge = prior.originAge.z;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) break;
+            }
+            float dragActivation = smoothstep(22.0f, 40.0f, movement);
+            if (dragActivation <= 0) continue;
+            float2 start = origin;
+            for (uint j = 0; j < uint(u.header.z); ++j) {
+                if (j != i && u.ripples[j].originAge.w > 0.5f
+                    && distance(u.ripples[j].end.xy, origin) < 0.1f
+                    && u.ripples[j].originAge.z >= age
+                    && u.ripples[j].originAge.z - age < 0.12f) {
+                    start = (u.ripples[j].originAge.xy + origin) * 0.5f;
+                    break;
+                }
+            }
+            float2 finish = (origin + tip) * 0.5f;
+            // Integrate overlapping smooth kernels along the curve. A nearest
+            // point solver can jump between roots on a bend, making hard seams.
+            for (uint sample = 0; sample < 8; ++sample) {
+            float t = (float(sample) + 0.5f) / 8.0f;
+            float2 nearest = mix(mix(start, origin, t), mix(origin, finish, t), t);
+            float2 derivative = 2 * mix(origin - start, finish - origin, t);
+            float2 tangent = derivative / max(length(derivative), 0.001f);
             float2 side = float2(-tangent.y, tangent.x);
-            float2 relative = point - origin;
-            float longitudinal = dot(relative, tangent);
-            float lateral = dot(relative, side);
-            // Open-sided ribbons follow the stroke; no circular segment caps.
-            // Older parts spread sideways, leaving a widening channel behind.
-            float width = (18 + age * 20 * travel) * scale;
-            float endFade = (10 + age * 12) * scale;
-            float ends = smoothstep(-endFade, 0.0f, longitudinal)
-                       * (1 - smoothstep(segmentLength, segmentLength + endFade, longitudinal));
-            float q = abs(lateral) / width;
+            float2 delta = point - nearest;
+            float lateral = dot(delta, side);
+            float axial = dot(delta, tangent);
+            // Elliptical caps round both ends rather than multiplying two
+            // rectangular masks. Older portions fan out into a broad wake.
+            float distance = sqrt(lateral * lateral + axial * axial * 0.5f + 0.01f);
+            float2 normal = (side * lateral + tangent * axial * 0.5f) / distance;
+            float longitudinalFade = 1;
+            float pixelFootprint = max(length(dfdx(point)), length(dfdy(point)));
+            float width = sqrt(pow((16 + age * 32 * travel) * scale, 2.0f)
+                             + pixelFootprint * pixelFootprint);
+            float q = distance / width;
             float channel = exp(-q * q * 0.5f);
             float life = smoothstep(0.0f, 0.02f, age) * (1 - smoothstep(0.20f, 1.2f, age));
             float edgeRadius = (18 + age * 100 * travel) * scale;
-            float edgeWidth = (11 + age * 7) * scale;
-            float edgeX = (abs(lateral) - edgeRadius) / edgeWidth;
+            float edgeWidth = sqrt(pow((13 + age * 10) * scale, 2.0f)
+                                 + pixelFootprint * pixelFootprint);
+            float edgeX = (distance - edgeRadius) / edgeWidth;
             float edge = exp(-edgeX * edgeX * 0.5f);
-            float influence = max(channel * 0.8f, edge) * life * ends;
-            if (influence > wakeCoverage) {
-                wakeCoverage = influence;
-                // A hollow channel and one rolling bank on either side.
-                float slope = (q * channel * 1.15f - edgeX * edge * 1.8f) * life * ends;
-                float2 normal = side * (lateral < 0 ? -1.0f : 1.0f);
-                wakeBend = normal * slope;
-                wakeLight = slope * dot(normal, normalize(float2(-0.6f, -0.8f)));
+            float influence = max(channel * 0.8f, edge) * life * longitudinalFade * dragActivation;
+            float weight = influence * influence;
+            float slope = (q * channel * 1.15f - edgeX * edge * 1.8f) * life * longitudinalFade;
+            wakeCoverage = max(wakeCoverage, influence);
+            wakeBend += normal * slope * weight;
+            wakeLight += slope * dot(normal, normalize(float2(-0.6f, -0.8f))) * weight;
+            wakeWeight += weight;
             }
             continue;
         }
@@ -83,6 +126,8 @@ fragment float4 liquid(Vertex v [[stage_in]],
         sunsetCrest = max(sunsetCrest, max(slope * light, 0.0f));
         sunsetTrough = max(sunsetTrough, max(-slope * light, 0.0f));
     }
+    wakeBend /= max(wakeWeight, 0.00001f);
+    wakeLight /= max(wakeWeight, 0.00001f);
     displacement += wakeBend * 7 * u.header.w;
     coverage = max(coverage, wakeCoverage * 0.9f);
     lighting += wakeLight * 0.065f;
