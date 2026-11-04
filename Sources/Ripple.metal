@@ -22,6 +22,9 @@ fragment float4 liquid(Vertex v [[stage_in]],
     float lighting = 0;
     float sunsetCrest = 0;
     float sunsetTrough = 0;
+    float wakeCoverage = 0;
+    float2 wakeBend = 0;
+    float wakeLight = 0;
     for (uint i = 0; i < uint(u.header.z); ++i) {
         float4 r = u.ripples[i].originAge;
         bool wake = r.w > 0.5f;
@@ -31,18 +34,33 @@ fragment float4 liquid(Vertex v [[stage_in]],
             float2 segment = u.ripples[i].end.xy - origin;
             float along = saturate(dot(point - origin, segment) / max(dot(segment, segment), 0.001f));
             origin += along * segment;
+            float2 delta = point - origin;
+            float distance = length(delta);
+            float2 normal = delta / max(distance, 0.001f);
+            float width = (22 + age * 14) * scale;
+            float q = distance / width;
+            float envelope = exp(-q * q * 0.5f);
+            float life = smoothstep(0.0f, 0.02f, age) * (1 - smoothstep(0.12f, 0.75f, age));
+            float influence = envelope * life;
+            // A shared distance field joins the finger's path into a channel.
+            // Selecting its strongest influence avoids stacked rings at joints.
+            if (influence > wakeCoverage) {
+                wakeCoverage = influence;
+                float slope = q * influence;
+                wakeBend = normal * slope;
+                wakeLight = slope * dot(normal, normalize(float2(-0.6f, -0.8f)));
+            }
+            continue;
         }
         float2 delta = point - origin;
         float distance = length(delta);
         float2 direction = delta / max(distance, 0.001f);
-        float radius = (wake ? 3 + age * 65 : 18 + age * 290) * scale;
-        float width = (wake ? 10 + age * 10 : 13 + age * 8) * scale;
+        float radius = (18 + age * 290) * scale;
+        float width = (13 + age * 8) * scale;
         float x = (distance - radius) / width;
         // A damped packet: a glassy crest followed by two softer waves.
         float envelope = exp(-x*x*0.22f);
-        float life = wake
-            ? smoothstep(0.0f, 0.015f, age) * (1 - smoothstep(0.12f, 0.75f, age)) * 0.75f
-            : smoothstep(0.0f, 0.07f, age) * (1 - smoothstep(0.8f, 1.65f, age));
+        float life = smoothstep(0.0f, 0.07f, age) * (1 - smoothstep(0.8f, 1.65f, age));
         float slope = sin(x * 2.9f) * envelope * life;
         displacement += direction * slope * 4 * u.header.w;
         coverage = max(coverage, envelope * life);
@@ -51,6 +69,11 @@ fragment float4 liquid(Vertex v [[stage_in]],
         sunsetCrest = max(sunsetCrest, max(slope * light, 0.0f));
         sunsetTrough = max(sunsetTrough, max(-slope * light, 0.0f));
     }
+    displacement += wakeBend * 5 * u.header.w;
+    coverage = max(coverage, wakeCoverage * 0.9f);
+    lighting += wakeLight * 0.045f;
+    sunsetCrest = max(sunsetCrest, max(wakeLight, 0.0f));
+    sunsetTrough = max(sunsetTrough, max(-wakeLight, 0.0f));
     float alpha = smoothstep(0.005f, 0.22f, coverage) * 0.65f;
     if (alpha < 0.001f) return float4(0);
     float length = metal::length(displacement);
@@ -83,8 +106,9 @@ fragment float4 liquid(Vertex v [[stage_in]],
         uint index = uint(phase);
         float3 reflection = mix(colors[index], colors[(index + 1) % 6],
                                 smoothstep(0.0f, 1.0f, fract(phase)));
-        refracted = mix(refracted, reflection * 0.18f, sunsetTrough * 0.12f);
-        refracted = mix(refracted, reflection, sunsetCrest * 0.24f);
+        refracted = mix(refracted, reflection * 0.18f, sunsetTrough * 0.22f);
+        refracted = mix(refracted, reflection, sunsetCrest * 0.60f);
+        refracted += reflection * sunsetCrest * 0.045f;
     } else if (u.style.z > 1.5f) {
         // Sunset reflections: amber/coral crests above deep teal troughs.
         // Preserve the refracted desktop between those moving highlights.
