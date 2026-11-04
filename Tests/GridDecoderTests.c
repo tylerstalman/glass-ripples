@@ -135,6 +135,21 @@ int main(void) {
         assert(!observeScan(4, 0xfe, sizeof(report), &x, &y));
         assert(!observeScan(1, 0xff, sizeof(report), &x, &y));
     }
+    // Row drift during a valid drag can form an isolated corner ghost. Remove
+    // the shared row shift without masking an actual finger at that corner.
+    drawGrid(-10, -10, 4096);
+    for (int row = rows - 2; row < rows; row++) {
+        for (int col = 0; col < columns; col++) {
+            int drift = col < 47 ? 90 : col >= 85 ? 120 : 0;
+            put16(pixels + 2 * (row * columns + col), (unsigned)(4096 - drift));
+        }
+    }
+    assert(!observeScan(2, 0, sizeof(report), &x, &y));
+    addFinger(88, 60);
+    assert(observeScan(2, 0, sizeof(report), &x, &y) == GRGridBegan);
+    assert(fabsf(x - 88.5f / columns) < 0.02f && y > 0.95f);
+    drawGrid(-10, -10, 4096);
+    assert(!observe(false, sizeof(report), &x, &y));
 
     // Use the same localized deficit in irrelevant and truncated frames.
     drawGrid(7, 53, 4096);
@@ -161,10 +176,20 @@ int main(void) {
     expectPress(30, 18);
 
     // A continuous hold across the 32-bit timestamp wrap stays one contact.
+    GRGridReset(&decoder);
     ticks = UINT32_MAX - 60000;
     drawGrid(-10, -10, 4096);
     assert(!observe(false, sizeof(report), &x, &y));
     expectPress(50, 20);
+    // Real hardware interleaves small profile packets with future timestamps.
+    // They must not reset finger identity when the next matrix arrives.
+    uint8_t statusOnly[frameHeader + sectionHeader + stateBytes];
+    memcpy(statusOnly, report, frameHeader);
+    memcpy(statusOnly + frameHeader, report + stateSection, sectionHeader + stateBytes);
+    unsigned future = ticks + 20000;
+    for (int i = 0; i < 4; i++) statusOnly[7+i] = (uint8_t)(future >> (8*i));
+    assert(GRGridTouches(&decoder, statusOnly, sizeof(statusOnly), events) == 0);
+    assert(decoder.fingers[0].active);
     // Movement follows the contact, remains rate limited, and never generates
     // repeated tap impulses. A fresh contact after lift starts a separate wake.
     int movements = 0;

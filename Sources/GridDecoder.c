@@ -53,11 +53,14 @@ int GRGridTouches(GRGridDecoder *d, const uint8_t *report, size_t length, GRGrid
     if (!readScan(report, length, &scan)) return 0;
     // Calibration sweeps change the grid gain and must never become contacts.
     if (!scan.idle && !scan.contact) return 0;
+    // Lightweight status/profile reports are interleaved with matrix scans
+    // and can carry later timestamps before an older matrix arrives.
+    const uint8_t *grid = scan.image;
+    if (!grid) return 0;
+    if (d->hasBaseline && (int32_t)(scan.micros - d->lastFrameUS) < 0) return 0;
     if (scan.micros - d->lastFrameUS > 250000u || scan.idle)
         memset(d->fingers, 0, sizeof(d->fingers));
     d->lastFrameUS = scan.micros;
-    const uint8_t *grid = scan.image;
-    if (!grid) return 0;
     if (scan.idle) {
         for (int i = 0; i < GRGridCount; i++) d->baseline[i] = value(grid, i);
         d->hasBaseline = true;
@@ -78,6 +81,24 @@ int GRGridTouches(GRGridDecoder *d, const uint8_t *report, size_t length, GRGrid
     uint16_t queue[GRGridCount];
     for (int i = 0; i < GRGridCount; i++)
         deficit[i] = gain * d->baseline[i] - value(grid, i);
+    // Active scan plans shift entire electrode rows, especially at the bezel.
+    // A median of distributed samples removes that common drift while retaining
+    // localized fingertip depressions, including genuine corner contacts.
+    for (int row = 0; row < GRGridRows; row++) {
+        float samples[9];
+        for (int i = 0; i < 9; i++) samples[i] = deficit[row * GRGridColumns + 5 + i * 10];
+        for (int i = 1; i < 9; i++) {
+            float sample = samples[i];
+            int j = i;
+            while (j > 0 && samples[j - 1] > sample) {
+                samples[j] = samples[j - 1];
+                j--;
+            }
+            samples[j] = sample;
+        }
+        for (int col = 0; col < GRGridColumns; col++)
+            deficit[row * GRGridColumns + col] -= samples[4];
+    }
     GRGridPoint candidates[GRMaxTouches];
     int count = 0;
     // Each connected patch is a fingertip. Weighted centers retain sub-cell
