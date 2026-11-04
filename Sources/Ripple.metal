@@ -2,7 +2,7 @@
 using namespace metal;
 
 struct Vertex { float4 position [[position]]; float2 uv; };
-struct Wave { float4 originAge; float4 end; };
+struct Wave { float4 originAge; float4 end; float4 curve; };
 struct Uniforms { float4 header; float4 style; Wave ripples[24]; };
 
 vertex Vertex fullscreen(uint id [[vertex_id]]) {
@@ -37,40 +37,9 @@ fragment float4 liquid(Vertex v [[stage_in]],
         float2 origin = r.xy;
         if (wake) {
             float2 tip = u.ripples[i].end.xy;
-            // Ignore back-and-forth contact jitter: qualify by displacement
-            // from the initial contact, not accumulated path length.
-            float movement = distance(origin, tip);
-            float2 previousPoint = origin;
-            float previousAge = age;
-            for (uint step = 0; step < 24; ++step) {
-                bool found = false;
-                for (uint j = 0; j < uint(u.header.z); ++j) {
-                    Wave prior = u.ripples[j];
-                    if (prior.originAge.w > 0.5f
-                        && prior.originAge.z > previousAge
-                        && prior.originAge.z - previousAge < 0.12f
-                        && distance(prior.end.xy, previousPoint) < 0.1f) {
-                        movement = distance(prior.originAge.xy, tip);
-                        previousPoint = prior.originAge.xy;
-                        previousAge = prior.originAge.z;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) break;
-            }
-            float dragActivation = smoothstep(22.0f, 40.0f, movement);
+            float dragActivation = u.ripples[i].curve.z;
             if (dragActivation <= 0) continue;
-            float2 start = origin;
-            for (uint j = 0; j < uint(u.header.z); ++j) {
-                if (j != i && u.ripples[j].originAge.w > 0.5f
-                    && distance(u.ripples[j].end.xy, origin) < 0.1f
-                    && u.ripples[j].originAge.z >= age
-                    && u.ripples[j].originAge.z - age < 0.12f) {
-                    start = (u.ripples[j].originAge.xy + origin) * 0.5f;
-                    break;
-                }
-            }
+            float2 start = u.ripples[i].curve.xy;
             float2 finish = (origin + tip) * 0.5f;
             // Integrate overlapping smooth kernels along the curve. A nearest
             // point solver can jump between roots on a bend, making hard seams.

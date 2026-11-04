@@ -38,6 +38,8 @@ Fingertips that meet or cross can temporarily merge into one detected patch. Thi
 
 ScreenCaptureKit supplies desktop pixels while an effect is active. Metal bends those pixels and samples red, green, and blue at slightly different offsets for chromatic dispersion. The overlay lets underlying apps receive input.
 
+Finger-history matching and curve setup run once per frame on the CPU, leaving the pixel shader to evaluate the smooth wake and refraction.
+
 Capture and drawing stop when effects expire. Movement emits at most 30 updates per second per finger, and at most 24 ripple or wake segments are drawn at once.
 
 A nonexclusive IOKit listener reads reports only from the built-in Apple Kiwi touchscreen. The decoder rejects calibration scans, finds separate fingertip patches, and matches them between frames. Sensor data and screen frames stay in memory. Nothing is transmitted.

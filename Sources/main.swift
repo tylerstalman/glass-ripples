@@ -191,10 +191,33 @@ final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate
         appearance.w = Float(now)
         var uniforms = [SIMD4<Float>(Float(screen.frame.width), Float(screen.frame.height), Float(ripples.count), 1), appearance]
         var bounds = CGRect.null
-        for ripple in ripples {
+        for (index, ripple) in ripples.enumerated() {
             let age = now - ripple.birth
+            var curveStart = ripple.point
+            var movement = hypot(ripple.end.x - ripple.point.x, ripple.end.y - ripple.point.y)
+            if ripple.wake {
+                var previousPoint = ripple.point
+                var previousBirth = ripple.birth
+                for step in 0..<maxRipples {
+                    guard let prior = ripples.enumerated().first(where: { candidate in
+                        candidate.offset != index && candidate.element.wake &&
+                        candidate.element.birth < previousBirth && previousBirth - candidate.element.birth < 0.12 &&
+                        hypot(candidate.element.end.x - previousPoint.x, candidate.element.end.y - previousPoint.y) < 0.1
+                    })?.element else { break }
+                    if step == 0 {
+                        curveStart = CGPoint(x: (prior.point.x + ripple.point.x) * 0.5,
+                                             y: (prior.point.y + ripple.point.y) * 0.5)
+                    }
+                    movement = hypot(prior.point.x - ripple.end.x, prior.point.y - ripple.end.y)
+                    previousPoint = prior.point
+                    previousBirth = prior.birth
+                }
+            }
+            let activation = min(1.0, max(0.0, (movement - 22) / 18))
             uniforms.append(SIMD4<Float>(Float(ripple.point.x), Float(ripple.point.y), Float(age), ripple.wake ? 1 : 0))
             uniforms.append(SIMD4<Float>(Float(ripple.end.x), Float(ripple.end.y), 0, 0))
+            uniforms.append(SIMD4<Float>(Float(curveStart.x), Float(curveStart.y),
+                                        Float(activation * activation * (3 - 2 * activation)), 0))
             let baseExtent = ripple.wake ? 3 + age * 65 + (10 + age * 10) * 5
                                          : 18 + age * 290 + (13 + age * 8) * 5
             let extent = baseExtent * Double(style.x) * 1.5
@@ -205,7 +228,7 @@ final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate
                                              width: extent * 2, height: extent * 2))
             }
         }
-        while uniforms.count < maxRipples * 2 + 2 { uniforms.append(.zero) }
+        while uniforms.count < maxRipples * 3 + 2 { uniforms.append(.zero) }
         let sx = CGFloat(drawable.texture.width) / screen.frame.width
         let sy = CGFloat(drawable.texture.height) / screen.frame.height
         let clipped = bounds.intersection(CGRect(origin: .zero, size: screen.frame.size))
