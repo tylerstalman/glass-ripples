@@ -41,12 +41,17 @@ fragment float4 liquid(Vertex v [[stage_in]],
             float q = distance / width;
             float envelope = exp(-q * q * 0.5f);
             float life = smoothstep(0.0f, 0.02f, age) * (1 - smoothstep(0.12f, 0.75f, age));
-            float influence = envelope * life;
+            float waveRadius = (14 + age * 120) * scale;
+            float waveWidth = (12 + age * 8) * scale;
+            float waveX = (distance - waveRadius) / waveWidth;
+            float waveEnvelope = exp(-waveX * waveX * 0.5f);
+            float influence = max(envelope * 0.6f, waveEnvelope) * life;
             // A shared distance field joins the finger's path into a channel.
             // Selecting its strongest influence avoids stacked rings at joints.
             if (influence > wakeCoverage) {
                 wakeCoverage = influence;
-                float slope = q * influence;
+                float slope = (q * envelope * 0.8f
+                               + sin(waveX * 2.3f) * waveEnvelope * 1.1f) * life;
                 wakeBend = normal * slope;
                 wakeLight = slope * dot(normal, normalize(float2(-0.6f, -0.8f)));
             }
@@ -69,9 +74,9 @@ fragment float4 liquid(Vertex v [[stage_in]],
         sunsetCrest = max(sunsetCrest, max(slope * light, 0.0f));
         sunsetTrough = max(sunsetTrough, max(-slope * light, 0.0f));
     }
-    displacement += wakeBend * 5 * u.header.w;
+    displacement += wakeBend * 7 * u.header.w;
     coverage = max(coverage, wakeCoverage * 0.9f);
-    lighting += wakeLight * 0.045f;
+    lighting += wakeLight * 0.065f;
     sunsetCrest = max(sunsetCrest, max(wakeLight, 0.0f));
     sunsetTrough = max(sunsetTrough, max(-wakeLight, 0.0f));
     float alpha = smoothstep(0.005f, 0.22f, coverage) * 0.65f;

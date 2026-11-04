@@ -23,7 +23,7 @@ The app is locally ad-hoc signed. Rebuilding can require removing the old Screen
 ## Use
 
 - Tap the built-in display for an expanding ripple.
-- Drag fingers to leave wide, continuous refractive wakes that bend along their paths.
+- Drag fingers to leave wide refractive wakes that follow their paths and send waves outward.
 - **Control–Option–Command–R** toggles the effect.
 - The water-waves menu includes a test ripple and Quit.
 - **Ripple Size** offers Small, Medium, and Large.
