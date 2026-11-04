@@ -23,13 +23,13 @@ The app is locally ad-hoc signed. Rebuilding can require removing the old Screen
 ## Use
 
 - Tap the built-in display for an expanding ripple.
-- Drag fingers to leave wide refractive wakes that follow their paths and send waves outward.
+- Drag fingers to leave continuous refractive channels with spreading banks along their paths.
 - **Control–Option–Command–R** toggles the effect.
 - The water-waves menu includes a test ripple and Quit.
-- **Ripple Strength** offers Low, Medium, and High, adjusting wave size, refraction, opacity, highlights, and color intensity together. Medium retains the original look.
+- **Ripple Strength** offers Low, Medium, and High, adjusting wave size, refraction, opacity, highlights, and color intensity together. Low uses clearer, more contained waves with fewer bands and shorter travel.
 - **Glass Color** offers Natural, Prism, Sunset, and Six Colors.
 
-These settings apply immediately and are remembered between launches. Waves keep an organic water shape. Natural keeps the subtle glass look. Prism adds psychedelic, flowing interference colors and pronounced chromatic refraction. Sunset adds amber/coral reflections over deep teal troughs. Six Colors uses flowing reflections in the classic green, yellow, orange, red, purple, and blue palette.
+These settings apply immediately and are remembered between launches. Waves keep an organic water shape. Natural uses slightly stronger clear refraction; colored modes are gentler to balance their added visibility. Prism adds psychedelic, flowing interference colors and pronounced chromatic refraction. Sunset adds amber/coral reflections over deep teal troughs. Six Colors uses flowing reflections in the classic green, yellow, orange, red, purple, and blue palette.
 - **Launch Glass Ripples.command** starts the app directly in your desktop session. Keep its Terminal window open. Runtime diagnostics are written to **GlassRipples.log** in your macOS temporary directory.
 
 Fingertips that meet or cross can temporarily merge into one detected patch. This experimental decoder targets a specific panel, and macOS updates may change its report format.

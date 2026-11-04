@@ -16,7 +16,10 @@ fragment float4 liquid(Vertex v [[stage_in]],
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float2 size = u.header.xy;
     float scale = u.style.x;
-    float strength = u.style.y;
+    bool lowStrength = u.style.y < 0.5f;
+    float travel = lowStrength ? 0.55f : 1.0f;
+    // Colored reflections read more strongly than clear refraction.
+    float strength = (lowStrength ? 0.62f : u.style.y) * (u.style.z < 0.5f ? 1.08f : 0.65f);
     float2 point = v.uv * size;
     float2 displacement = 0;
     float coverage = 0;
@@ -33,26 +36,31 @@ fragment float4 liquid(Vertex v [[stage_in]],
         float2 origin = r.xy;
         if (wake) {
             float2 segment = u.ripples[i].end.xy - origin;
-            float along = saturate(dot(point - origin, segment) / max(dot(segment, segment), 0.001f));
-            origin += along * segment;
-            float2 delta = point - origin;
-            float distance = length(delta);
-            float2 normal = delta / max(distance, 0.001f);
-            float width = (22 + age * 14) * scale;
-            float q = distance / width;
-            float envelope = exp(-q * q * 0.5f);
+            float segmentLength = max(length(segment), 0.001f);
+            float2 tangent = segment / segmentLength;
+            float2 side = float2(-tangent.y, tangent.x);
+            float2 relative = point - origin;
+            float longitudinal = dot(relative, tangent);
+            float lateral = dot(relative, side);
+            // Open-sided ribbons follow the stroke; no circular segment caps.
+            // Older parts spread sideways, leaving a widening channel behind.
+            float width = (18 + age * 20 * travel) * scale;
+            float endFade = (10 + age * 12) * scale;
+            float ends = smoothstep(-endFade, 0.0f, longitudinal)
+                       * (1 - smoothstep(segmentLength, segmentLength + endFade, longitudinal));
+            float q = abs(lateral) / width;
+            float channel = exp(-q * q * 0.5f);
             float life = smoothstep(0.0f, 0.02f, age) * (1 - smoothstep(0.20f, 1.2f, age));
-            float waveRadius = (14 + age * 140) * scale;
-            float waveWidth = (12 + age * 8) * scale;
-            float waveX = (distance - waveRadius) / waveWidth;
-            float waveEnvelope = exp(-waveX * waveX * 0.5f);
-            float influence = max(envelope * 0.6f, waveEnvelope) * life;
-            // A shared distance field joins the finger's path into a channel.
-            // Selecting its strongest influence avoids stacked rings at joints.
+            float edgeRadius = (18 + age * 100 * travel) * scale;
+            float edgeWidth = (11 + age * 7) * scale;
+            float edgeX = (abs(lateral) - edgeRadius) / edgeWidth;
+            float edge = exp(-edgeX * edgeX * 0.5f);
+            float influence = max(channel * 0.8f, edge) * life * ends;
             if (influence > wakeCoverage) {
                 wakeCoverage = influence;
-                float slope = (q * envelope * 0.8f
-                               + sin(waveX * 2.3f) * waveEnvelope * 1.1f) * life;
+                // A hollow channel and one rolling bank on either side.
+                float slope = (q * channel * 1.15f - edgeX * edge * 1.8f) * life * ends;
+                float2 normal = side * (lateral < 0 ? -1.0f : 1.0f);
                 wakeBend = normal * slope;
                 wakeLight = slope * dot(normal, normalize(float2(-0.6f, -0.8f)));
             }
@@ -61,13 +69,13 @@ fragment float4 liquid(Vertex v [[stage_in]],
         float2 delta = point - origin;
         float distance = length(delta);
         float2 direction = delta / max(distance, 0.001f);
-        float radius = (18 + age * 290) * scale;
+        float radius = (18 + age * 290 * travel) * scale;
         float width = (13 + age * 8) * scale;
         float x = (distance - radius) / width;
         // A damped packet: a glassy crest followed by two softer waves.
         float envelope = exp(-x*x*0.22f);
         float life = smoothstep(0.0f, 0.07f, age) * (1 - smoothstep(0.8f, 1.65f, age));
-        float slope = sin(x * 2.9f) * envelope * life;
+        float slope = sin(x * (lowStrength ? 1.8f : 2.9f)) * envelope * life;
         displacement += direction * slope * 4 * u.header.w;
         coverage = max(coverage, envelope * life);
         float light = dot(direction, normalize(float2(-0.6f, -0.8f)));
@@ -80,7 +88,8 @@ fragment float4 liquid(Vertex v [[stage_in]],
     lighting += wakeLight * 0.065f;
     sunsetCrest = max(sunsetCrest, max(wakeLight, 0.0f));
     sunsetTrough = max(sunsetTrough, max(-wakeLight, 0.0f));
-    float alpha = smoothstep(0.005f, 0.22f, coverage) * min(0.9f, 0.65f * strength);
+    float alpha = smoothstep(0.005f, 0.22f, coverage)
+                * (lowStrength ? 0.42f : min(0.9f, 0.65f * strength));
     if (alpha < 0.001f) return float4(0);
     displacement *= strength;
     float length = metal::length(displacement);
