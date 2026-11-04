@@ -1,0 +1,5 @@
+*.app/
+Launch.log
+.DS_Store
+.glass-build.*/
+.build-cache/
