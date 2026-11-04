@@ -42,6 +42,7 @@ final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate
     private var filter: SCContentFilter?
     private let config: SCStreamConfiguration
     var reportError: ((Error) -> Void)?
+    var style = SIMD4<Float>(1, 0, 0, 0)
 
     init(screen: NSScreen, display: SCDisplay,
          device: MTLDevice, pipeline: MTLRenderPipelineState) throws {
@@ -185,14 +186,15 @@ final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate
               let pass = view.currentRenderPassDescriptor,
               let command = queue.makeCommandBuffer(),
               let encoder = command.makeRenderCommandEncoder(descriptor: pass) else { return }
-        var uniforms = [SIMD4<Float>(Float(screen.frame.width), Float(screen.frame.height), Float(ripples.count), 1)]
+        var uniforms = [SIMD4<Float>(Float(screen.frame.width), Float(screen.frame.height), Float(ripples.count), 1), style]
         var bounds = CGRect.null
         for ripple in ripples {
             let age = now - ripple.birth
             uniforms.append(SIMD4<Float>(Float(ripple.point.x), Float(ripple.point.y), Float(age), ripple.wake ? 1 : 0))
             uniforms.append(SIMD4<Float>(Float(ripple.end.x), Float(ripple.end.y), 0, 0))
-            let extent = ripple.wake ? 3 + age * 65 + (10 + age * 10) * 5
-                                     : 18 + age * 290 + (13 + age * 8) * 5
+            let baseExtent = ripple.wake ? 3 + age * 65 + (10 + age * 10) * 5
+                                         : 18 + age * 290 + (13 + age * 8) * 5
+            let extent = baseExtent * Double(style.x) * 1.5
             bounds = bounds.union(CGRect(x: ripple.point.x - extent, y: ripple.point.y - extent,
                                          width: extent * 2, height: extent * 2))
             if ripple.wake {
@@ -200,7 +202,7 @@ final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate
                                              width: extent * 2, height: extent * 2))
             }
         }
-        while uniforms.count < maxRipples * 2 + 1 { uniforms.append(.zero) }
+        while uniforms.count < maxRipples * 2 + 2 { uniforms.append(.zero) }
         let sx = CGFloat(drawable.texture.width) / screen.frame.width
         let sy = CGFloat(drawable.texture.height) / screen.frame.height
         let clipped = bounds.intersection(CGRect(origin: .zero, size: screen.frame.size))
@@ -246,9 +248,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pipeline: MTLRenderPipelineState!
     private var loggedTouch = false
     private var lastTouchPoints: [Int32: CGPoint] = [:]
+    private var effectOptions = [1, 0, 0]
+    private var effectItems: [NSMenuItem] = []
+
+    private var effectStyle: SIMD4<Float> {
+        SIMD4<Float>([0.65, 1, 1.4][effectOptions[0]], Float(effectOptions[1]), Float(effectOptions[2]), 0)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { try setupMetal() } catch { show(error); NSApp.terminate(nil); return }
+        if let saved = UserDefaults.standard.array(forKey: "effectOptions") as? [Int],
+           saved.count == 3, (0...2).contains(saved[0]),
+           (0...2).contains(saved[1]), (0...3).contains(saved[2]) { effectOptions = saved }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "Glass Ripples")
         let menu = NSMenu()
@@ -259,6 +270,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleItem.target = self
         let demo = menu.addItem(withTitle: "Test Ripple", action: #selector(testRipple), keyEquivalent: "")
         demo.target = self
+        menu.addItem(.separator())
+        let choices = [("Ripple Size", ["Small", "Medium", "Large"]),
+                       ("Ripple Shape", ["Round", "Rounded Square", "Diamond"]),
+                       ("Glass Color", ["Natural", "Prism", "Cool", "Warm"])]
+        for (group, choice) in choices.enumerated() {
+            let parent = menu.addItem(withTitle: choice.0, action: nil, keyEquivalent: "")
+            let submenu = NSMenu(title: choice.0)
+            for (index, title) in choice.1.enumerated() {
+                let option = submenu.addItem(withTitle: title, action: #selector(changeEffect(_:)), keyEquivalent: "")
+                option.target = self
+                option.tag = group * 10 + index
+                option.state = effectOptions[group] == index ? .on : .off
+                effectItems.append(option)
+            }
+            parent.submenu = submenu
+        }
         menu.addItem(.separator())
         let access = menu.addItem(withTitle: "Screen Recording Settings…", action: #selector(openSettings), keyEquivalent: "")
         access.target = self
@@ -324,6 +351,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                           let display = content.displays.first(where: { $0.displayID == id.uint32Value }) else { continue }
                     let surface = try Surface(screen: screen, display: display, device: device, pipeline: pipeline)
                     surface.reportError = { [weak self] error in self?.disable(); self?.show(error) }
+                    surface.style = effectStyle
                     ready.append(surface)
                 }
                 guard ready.count == 1 else { throw AppError.message("Open the built-in display to enable touch ripples.") }
@@ -370,6 +398,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         toggleItem.title = enabled ? "Disable Ripples   ⌃⌥⌘R" : "Enable Ripples   ⌃⌥⌘R"
         toggleItem.state = enabled ? .on : .off
         item.button?.appearsDisabled = !enabled
+    }
+
+    @objc private func changeEffect(_ sender: NSMenuItem) {
+        effectOptions[sender.tag / 10] = sender.tag % 10
+        UserDefaults.standard.set(effectOptions, forKey: "effectOptions")
+        for option in effectItems {
+            option.state = effectOptions[option.tag / 10] == option.tag % 10 ? .on : .off
+        }
+        surfaces.forEach { $0.style = effectStyle }
     }
 
     private func touched(x: Float, y: Float, identifier: Int32, moving: Bool) {

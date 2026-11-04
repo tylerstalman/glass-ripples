@@ -3,7 +3,7 @@ using namespace metal;
 
 struct Vertex { float4 position [[position]]; float2 uv; };
 struct Wave { float4 originAge; float4 end; };
-struct Uniforms { float4 header; Wave ripples[24]; };
+struct Uniforms { float4 header; float4 style; Wave ripples[24]; };
 
 vertex Vertex fullscreen(uint id [[vertex_id]]) {
     float2 p = float2((id << 1) & 2, id & 2);
@@ -15,6 +15,7 @@ fragment float4 liquid(Vertex v [[stage_in]],
                        constant Uniforms& u [[buffer(0)]]) {
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float2 size = u.header.xy;
+    float scale = u.style.x;
     float2 point = v.uv * size;
     float2 displacement = 0;
     float coverage = 0;
@@ -32,8 +33,16 @@ fragment float4 liquid(Vertex v [[stage_in]],
         float2 delta = point - origin;
         float distance = length(delta);
         float2 direction = delta / max(distance, 0.001f);
-        float radius = wake ? 3 + age * 65 : 18 + age * 290;
-        float width = wake ? 10 + age * 10 : 13 + age * 8;
+        if (!wake && u.style.y > 1.5f) {
+            distance = (abs(delta.x) + abs(delta.y)) * 0.7071f;
+            direction = sign(delta) * 0.7071f;
+        } else if (!wake && u.style.y > 0.5f) {
+            distance = sqrt(length(delta * delta));
+            float2 normal = delta * delta * delta;
+            direction = normal / max(length(normal), 0.001f);
+        }
+        float radius = (wake ? 3 + age * 65 : 18 + age * 290) * scale;
+        float width = (wake ? 10 + age * 10 : 13 + age * 8) * scale;
         float x = (distance - radius) / width;
         // A damped packet: a glassy crest followed by two softer waves.
         float envelope = exp(-x*x*0.22f);
@@ -53,9 +62,13 @@ fragment float4 liquid(Vertex v [[stage_in]],
     float2 offset = displacement / size;
     // Wavelength-dependent sampling produces actual color separation of the
     // captured background, rather than a rainbow painted over a white ring.
-    float3 refracted = float3(desktop.sample(s, v.uv + offset * 1.28f).r,
+    float dispersion = (u.style.z > 0.5f && u.style.z < 1.5f) ? 0.55f : 0.28f;
+    float3 refracted = float3(desktop.sample(s, v.uv + offset * (1 + dispersion)).r,
                               desktop.sample(s, v.uv + offset).g,
-                              desktop.sample(s, v.uv + offset * 0.72f).b);
+                              desktop.sample(s, v.uv + offset * (1 - dispersion)).b);
+    float3 tint = u.style.z > 2.5f ? float3(0.025f, 0.008f, -0.015f)
+                : u.style.z > 1.5f ? float3(-0.015f, 0.008f, 0.025f) : float3(0);
+    refracted += tint * coverage;
     refracted = clamp(refracted + lighting * coverage, 0.0f, 1.0f);
     return float4(refracted * alpha, alpha); // Premultiplied alpha.
 }
