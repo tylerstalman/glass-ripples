@@ -20,6 +20,8 @@ fragment float4 liquid(Vertex v [[stage_in]],
     float2 displacement = 0;
     float coverage = 0;
     float lighting = 0;
+    float sunsetCrest = 0;
+    float sunsetTrough = 0;
     for (uint i = 0; i < uint(u.header.z); ++i) {
         float4 r = u.ripples[i].originAge;
         bool wake = r.w > 0.5f;
@@ -33,27 +35,21 @@ fragment float4 liquid(Vertex v [[stage_in]],
         float2 delta = point - origin;
         float distance = length(delta);
         float2 direction = delta / max(distance, 0.001f);
-        if (!wake && u.style.y > 1.5f) {
-            distance = (abs(delta.x) + abs(delta.y)) * 0.7071f;
-            direction = sign(delta) * 0.7071f;
-        } else if (!wake && u.style.y > 0.5f) {
-            distance = sqrt(length(delta * delta));
-            float2 normal = delta * delta * delta;
-            direction = normal / max(length(normal), 0.001f);
-        }
         float radius = (wake ? 3 + age * 65 : 18 + age * 290) * scale;
         float width = (wake ? 10 + age * 10 : 13 + age * 8) * scale;
         float x = (distance - radius) / width;
         // A damped packet: a glassy crest followed by two softer waves.
         float envelope = exp(-x*x*0.22f);
         float life = wake
-            ? smoothstep(0.0f, 0.015f, age) * (1 - smoothstep(0.12f, 0.75f, age)) * 0.45f
+            ? smoothstep(0.0f, 0.015f, age) * (1 - smoothstep(0.12f, 0.75f, age)) * 0.75f
             : smoothstep(0.0f, 0.07f, age) * (1 - smoothstep(0.8f, 1.65f, age));
         float slope = sin(x * 2.9f) * envelope * life;
         displacement += direction * slope * 4 * u.header.w;
         coverage = max(coverage, envelope * life);
         float light = dot(direction, normalize(float2(-0.6f, -0.8f)));
         lighting += slope * light * 0.035f + pow(max(0.0f, slope * light), 5.0f) * 0.05f;
+        sunsetCrest = max(sunsetCrest, max(slope * light, 0.0f));
+        sunsetTrough = max(sunsetTrough, max(-slope * light, 0.0f));
     }
     float alpha = smoothstep(0.005f, 0.22f, coverage) * 0.65f;
     if (alpha < 0.001f) return float4(0);
@@ -62,13 +58,39 @@ fragment float4 liquid(Vertex v [[stage_in]],
     float2 offset = displacement / size;
     // Wavelength-dependent sampling produces actual color separation of the
     // captured background, rather than a rainbow painted over a white ring.
-    float dispersion = (u.style.z > 0.5f && u.style.z < 1.5f) ? 0.55f : 0.28f;
+    bool prism = u.style.z > 0.5f && u.style.z < 1.5f;
+    float dispersion = prism ? 0.5f : 0.28f;
+    float3 centerColor = desktop.sample(s, v.uv + offset).rgb;
     float3 refracted = float3(desktop.sample(s, v.uv + offset * (1 + dispersion)).r,
-                              desktop.sample(s, v.uv + offset).g,
+                              centerColor.g,
                               desktop.sample(s, v.uv + offset * (1 - dispersion)).b);
-    float3 tint = u.style.z > 2.5f ? float3(0.025f, 0.008f, -0.015f)
-                : u.style.z > 1.5f ? float3(-0.015f, 0.008f, 0.025f) : float3(0);
-    refracted += tint * coverage;
+    if (prism) {
+        // Limit the introduced fringe, retaining the desktop's own palette.
+        float3 fringe = clamp((refracted - centerColor) * 0.65f, -0.10f, 0.10f);
+        refracted = centerColor + fringe;
+    }
+    if (u.style.z > 2.5f) {
+        constexpr float3 colors[6] = {
+            float3(98, 187, 71) / 255.0f,
+            float3(252, 184, 39) / 255.0f,
+            float3(246, 130, 31) / 255.0f,
+            float3(224, 58, 62) / 255.0f,
+            float3(150, 61, 151) / 255.0f,
+            float3(0, 157, 220) / 255.0f
+        };
+        // Smooth reflections use the six reference colors without hard bands.
+        float phase = fract(v.uv.y * 0.65f + v.uv.x * 0.35f + u.style.w * 0.02f) * 6;
+        uint index = uint(phase);
+        float3 reflection = mix(colors[index], colors[(index + 1) % 6],
+                                smoothstep(0.0f, 1.0f, fract(phase)));
+        refracted = mix(refracted, reflection * 0.18f, sunsetTrough * 0.12f);
+        refracted = mix(refracted, reflection, sunsetCrest * 0.24f);
+    } else if (u.style.z > 1.5f) {
+        // Sunset reflections: amber/coral crests above deep teal troughs.
+        // Preserve the refracted desktop between those moving highlights.
+        refracted = mix(refracted, float3(0.025f, 0.18f, 0.23f), sunsetTrough * 0.20f);
+        refracted += float3(0.26f, 0.105f, -0.035f) * sunsetCrest;
+    }
     refracted = clamp(refracted + lighting * coverage, 0.0f, 1.0f);
     return float4(refracted * alpha, alpha); // Premultiplied alpha.
 }

@@ -187,7 +187,9 @@ final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate
               let pass = view.currentRenderPassDescriptor,
               let command = queue.makeCommandBuffer(),
               let encoder = command.makeRenderCommandEncoder(descriptor: pass) else { return }
-        var uniforms = [SIMD4<Float>(Float(screen.frame.width), Float(screen.frame.height), Float(ripples.count), 1), style]
+        var appearance = style
+        appearance.w = Float(now)
+        var uniforms = [SIMD4<Float>(Float(screen.frame.width), Float(screen.frame.height), Float(ripples.count), 1), appearance]
         var bounds = CGRect.null
         for ripple in ripples {
             let age = now - ripple.birth
@@ -249,22 +251,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pipeline: MTLRenderPipelineState!
     private var loggedTouch = false
     private var lastTouchPoints: [Int32: CGPoint] = [:]
-    private var effectOptions = [1, 0, 0]
+    private var effectOptions = [1, 0]
     private var effectItems: [NSMenuItem] = []
 
     private var effectStyle: SIMD4<Float> {
-        SIMD4<Float>([0.65, 1, 1.4][effectOptions[0]], Float(effectOptions[1]), Float(effectOptions[2]), 0)
+        SIMD4<Float>([0.65, 1, 1.4][effectOptions[0]], 0, Float(effectOptions[1]), 0)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         do { try setupMetal() } catch { show(error); NSApp.terminate(nil); return }
-        if let saved = UserDefaults.standard.array(forKey: "effectOptions") as? [Int],
-           saved.count == 3, (0...2).contains(saved[0]),
-           (0...2).contains(saved[1]), (0...3).contains(saved[2]) { effectOptions = saved }
+        if let saved = UserDefaults.standard.array(forKey: "effectOptions") as? [Int] {
+            if saved.count == 2, (0...2).contains(saved[0]), (0...3).contains(saved[1]) {
+                effectOptions = saved
+            } else if saved.count == 3, (0...2).contains(saved[0]), (0...3).contains(saved[2]) {
+                // Older preferences stored a shape and separate Cool/Warm styles.
+                effectOptions = [saved[0], min(saved[2], 2)]
+            }
+        }
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "Glass Ripples")
         let menu = NSMenu()
-        let version = menu.addItem(withTitle: "Glass Ripples 0.4 · Touch & Drag", action: nil, keyEquivalent: "")
+        let version = menu.addItem(withTitle: "Glass Ripples 0.4.1 · Touch & Drag", action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(.separator())
         toggleItem = menu.addItem(withTitle: "Ripples Enabled   ⌃⌥⌘R", action: #selector(toggle), keyEquivalent: "")
@@ -273,8 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.target = self
         menu.addItem(.separator())
         let choices = [("Ripple Size", ["Small", "Medium", "Large"]),
-                       ("Ripple Shape", ["Round", "Rounded Square", "Diamond"]),
-                       ("Glass Color", ["Natural", "Prism", "Cool", "Warm"])]
+                       ("Glass Color", ["Natural", "Prism", "Sunset", "Six Colors"])]
         for (group, choice) in choices.enumerated() {
             let parent = menu.addItem(withTitle: choice.0, action: nil, keyEquivalent: "")
             let submenu = NSMenu(title: choice.0)
@@ -378,7 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }, Unmanaged.passUnretained(self).toOpaque()) != 0 else {
                     throw AppError.message(String(cString: GRLastTouchError()))
                 }
-                NSLog("Glass Ripples 0.4: built-in touchscreen reader enabled")
+                NSLog("Glass Ripples 0.4.1: built-in touchscreen reader enabled")
                 loggedTouch = false
                 surfaces = ready
                 enabled = true

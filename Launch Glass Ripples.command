@@ -11,7 +11,7 @@ if [[ ! -x "$EXECUTABLE" ]]; then
 fi
 echo "Restarting Glass Ripples through macOS."
 echo "Look for the water-waves icon in the menu bar and the first-launch dialog."
-echo "Version 0.4: tap for ripples, drag a finger to leave a water wake."
+echo "Version 0.4.1: tap for ripples, drag a finger to leave a water wake."
 echo "Toggle: Control–Option–Command–R"
 echo "Errors are saved in Launch.log in this folder."
 echo

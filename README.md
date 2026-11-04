@@ -27,10 +27,9 @@ The app is locally ad-hoc signed. Rebuilding can require removing the old Screen
 - **Control–Option–Command–R** toggles the effect.
 - The water-waves menu includes a test ripple and Quit.
 - **Ripple Size** offers Small, Medium, and Large.
-- **Ripple Shape** offers Round, Rounded Square, and Diamond.
-- **Glass Color** offers Natural, Prism, Cool, and Warm.
+- **Glass Color** offers Natural, Prism, Sunset, and Six Colors.
 
-These settings apply immediately and are remembered between launches. Natural keeps the subtle glass look. Prism increases chromatic dispersion, while Cool and Warm add a faint glass tint.
+These settings apply immediately and are remembered between launches. Waves keep an organic water shape. Natural keeps the subtle glass look. Prism adds restrained chromatic dispersion. Sunset adds amber/coral reflections over deep teal troughs. Six Colors uses flowing reflections in the classic green, yellow, orange, red, purple, and blue palette.
 - **Launch Glass Ripples.command** restarts the app and saves errors in local **Launch.log**.
 
 Fingertips that meet or cross can temporarily merge into one detected patch. This experimental decoder targets a specific panel, and macOS updates may change its report format.
