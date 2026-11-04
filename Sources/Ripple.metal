@@ -87,15 +87,21 @@ fragment float4 liquid(Vertex v [[stage_in]],
     // Wavelength-dependent sampling produces actual color separation of the
     // captured background, rather than a rainbow painted over a white ring.
     bool prism = u.style.z > 0.5f && u.style.z < 1.5f;
-    float dispersion = prism ? 0.5f : 0.28f;
+    float dispersion = prism ? 1.15f : 0.28f;
     float3 centerColor = desktop.sample(s, v.uv + offset).rgb;
     float3 refracted = float3(desktop.sample(s, v.uv + offset * (1 + dispersion)).r,
                               centerColor.g,
                               desktop.sample(s, v.uv + offset * (1 - dispersion)).b);
     if (prism) {
-        // Limit the introduced fringe, retaining the desktop's own palette.
-        float3 fringe = clamp((refracted - centerColor) * 0.65f, -0.10f, 0.10f);
-        refracted = centerColor + fringe;
+        // Thin-film-style interference follows the bent surface, with a slow
+        // spectral drift so the highlights flow through magenta, cyan and gold.
+        float phase = dot(displacement, float2(0.045f, -0.035f))
+                    + dot(v.uv, float2(0.8f, 0.65f)) + u.style.w * 0.06f;
+        float3 film = 0.5f + 0.5f * cos(6.283185f * (phase + float3(0, 0.3333f, 0.6667f)));
+        float crest = saturate(sunsetCrest + sunsetTrough);
+        refracted = mix(centerColor, refracted, 0.8f);
+        refracted = mix(refracted, film, saturate(crest * 0.48f + coverage * 0.12f));
+        refracted += film * crest * 0.10f;
     }
     if (u.style.z > 2.5f) {
         constexpr float3 colors[6] = {

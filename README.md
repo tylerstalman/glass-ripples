@@ -29,7 +29,7 @@ The app is locally ad-hoc signed. Rebuilding can require removing the old Screen
 - **Ripple Size** offers Small, Medium, and Large.
 - **Glass Color** offers Natural, Prism, Sunset, and Six Colors.
 
-These settings apply immediately and are remembered between launches. Waves keep an organic water shape. Natural keeps the subtle glass look. Prism adds restrained chromatic dispersion. Sunset adds amber/coral reflections over deep teal troughs. Six Colors uses flowing reflections in the classic green, yellow, orange, red, purple, and blue palette.
+These settings apply immediately and are remembered between launches. Waves keep an organic water shape. Natural keeps the subtle glass look. Prism adds psychedelic, flowing interference colors and pronounced chromatic refraction. Sunset adds amber/coral reflections over deep teal troughs. Six Colors uses flowing reflections in the classic green, yellow, orange, red, purple, and blue palette.
 - **Launch Glass Ripples.command** starts the app directly in your desktop session. Keep its Terminal window open. Runtime diagnostics are written to **GlassRipples.log** in your macOS temporary directory.
 
 Fingertips that meet or cross can temporarily merge into one detected patch. This experimental decoder targets a specific panel, and macOS updates may change its report format.
