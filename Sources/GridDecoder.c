@@ -39,7 +39,7 @@ static bool readScan(const uint8_t *p, size_t length, Scan *scan) {
         if (bytes == 36 && type == 0x5200) {
             hasScanMode = true;
             scan->idle = p[pos+24] == 0 && p[pos+27] == 0xfe;
-            scan->contact = p[pos+24] == 1 && p[pos+27] == 0;
+            scan->contact = p[pos+24] >= 1 && p[pos+24] <= GRMaxTouches && p[pos+27] == 0;
         }
         pos += bytes;
     }

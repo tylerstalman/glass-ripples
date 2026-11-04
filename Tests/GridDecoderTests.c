@@ -187,7 +187,7 @@ int main(void) {
     drawGrid(-10, -10, 4096);
     assert(!observe(false, sizeof(report), &x, &y));
     addFinger(10, 10); addFinger(40, 30); addFinger(75, 50);
-    (void)observe(true, sizeof(report), &x, &y);
+    (void)observeScan(2, 0, sizeof(report), &x, &y);
     assert(eventCount == 3);
     int ids[3];
     for (int i = 0; i < 3; i++) {
@@ -197,7 +197,7 @@ int main(void) {
     ticks += 40000;
     drawGrid(-10, -10, 4096);
     addFinger(12, 10); addFinger(42, 30); addFinger(77, 50);
-    (void)observe(true, sizeof(report), &x, &y);
+    (void)observeScan(4, 0, sizeof(report), &x, &y);
     assert(eventCount == 3);
     for (int i = 0; i < 3; i++) {
         assert(events[i].phase == GRGridMoved);

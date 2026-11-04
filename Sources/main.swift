@@ -3,6 +3,7 @@ import MetalKit
 import ScreenCaptureKit
 import CoreMedia
 import Carbon
+import Darwin
 
 private let duration = 1.65
 private let maxRipples = 24
@@ -266,7 +267,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let version = menu.addItem(withTitle: "Glass Ripples 0.4 · Touch & Drag", action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(.separator())
-        toggleItem = menu.addItem(withTitle: "Enable Ripples   ⌃⌥⌘R", action: #selector(toggle), keyEquivalent: "")
+        toggleItem = menu.addItem(withTitle: "Ripples Enabled   ⌃⌥⌘R", action: #selector(toggle), keyEquivalent: "")
         toggleItem.target = self
         let demo = menu.addItem(withTitle: "Test Ripple", action: #selector(testRipple), keyEquivalent: "")
         demo.target = self
@@ -395,7 +396,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateMenu() {
-        toggleItem.title = enabled ? "Disable Ripples   ⌃⌥⌘R" : "Enable Ripples   ⌃⌥⌘R"
+        toggleItem.title = "Ripples Enabled   ⌃⌥⌘R"
         toggleItem.state = enabled ? .on : .off
         item.button?.appearsDisabled = !enabled
     }
@@ -483,6 +484,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+let logURL = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("Launch.log")
+if let log = fopen(logURL.path, "a") {
+    dup2(fileno(log), STDERR_FILENO)
+    fclose(log)
+}
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.setActivationPolicy(.accessory)
