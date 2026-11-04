@@ -43,7 +43,7 @@ final class Surface: NSObject, MTKViewDelegate, SCStreamOutput, SCStreamDelegate
     private var filter: SCContentFilter?
     private let config: SCStreamConfiguration
     var reportError: ((Error) -> Void)?
-    var style = SIMD4<Float>(1, 0, 0, 0)
+    var style = SIMD4<Float>(1, 1, 0, 0)
 
     init(screen: NSScreen, display: SCDisplay,
          device: MTLDevice, pipeline: MTLRenderPipelineState) throws {
@@ -255,7 +255,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var effectItems: [NSMenuItem] = []
 
     private var effectStyle: SIMD4<Float> {
-        SIMD4<Float>([0.65, 1, 1.4][effectOptions[0]], 0, Float(effectOptions[1]), 0)
+        SIMD4<Float>([0.72, 1, 1.3][effectOptions[0]],
+                     [0.45, 1, 1.45][effectOptions[0]], Float(effectOptions[1]), 0)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -271,7 +272,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(systemSymbolName: "water.waves", accessibilityDescription: "Glass Ripples")
         let menu = NSMenu()
-        let version = menu.addItem(withTitle: "Glass Ripples 0.4.2 · Touch & Drag", action: nil, keyEquivalent: "")
+        let version = menu.addItem(withTitle: "Glass Ripples 0.4.3 · Touch & Drag", action: nil, keyEquivalent: "")
         version.isEnabled = false
         menu.addItem(.separator())
         toggleItem = menu.addItem(withTitle: "Ripples Enabled   ⌃⌥⌘R", action: #selector(toggle), keyEquivalent: "")
@@ -279,7 +280,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let demo = menu.addItem(withTitle: "Test Ripple", action: #selector(testRipple), keyEquivalent: "")
         demo.target = self
         menu.addItem(.separator())
-        let choices = [("Ripple Size", ["Small", "Medium", "Large"]),
+        let choices = [("Ripple Strength", ["Low", "Medium", "High"]),
                        ("Glass Color", ["Natural", "Prism", "Sunset", "Six Colors"])]
         for (group, choice) in choices.enumerated() {
             let parent = menu.addItem(withTitle: choice.0, action: nil, keyEquivalent: "")
@@ -385,7 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }, Unmanaged.passUnretained(self).toOpaque()) != 0 else {
                     throw AppError.message(String(cString: GRLastTouchError()))
                 }
-                NSLog("Glass Ripples 0.4.2: built-in touchscreen reader enabled")
+                NSLog("Glass Ripples 0.4.3: built-in touchscreen reader enabled")
                 loggedTouch = false
                 surfaces = ready
                 enabled = true

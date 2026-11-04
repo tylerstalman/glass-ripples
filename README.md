@@ -26,7 +26,7 @@ The app is locally ad-hoc signed. Rebuilding can require removing the old Screen
 - Drag fingers to leave wide refractive wakes that follow their paths and send waves outward.
 - **Control–Option–Command–R** toggles the effect.
 - The water-waves menu includes a test ripple and Quit.
-- **Ripple Size** offers Small, Medium, and Large.
+- **Ripple Strength** offers Low, Medium, and High, adjusting wave size, refraction, opacity, highlights, and color intensity together. Medium retains the original look.
 - **Glass Color** offers Natural, Prism, Sunset, and Six Colors.
 
 These settings apply immediately and are remembered between launches. Waves keep an organic water shape. Natural keeps the subtle glass look. Prism adds psychedelic, flowing interference colors and pronounced chromatic refraction. Sunset adds amber/coral reflections over deep teal troughs. Six Colors uses flowing reflections in the classic green, yellow, orange, red, purple, and blue palette.

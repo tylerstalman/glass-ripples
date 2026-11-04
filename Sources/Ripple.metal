@@ -16,6 +16,7 @@ fragment float4 liquid(Vertex v [[stage_in]],
     constexpr sampler s(coord::normalized, address::clamp_to_edge, filter::linear);
     float2 size = u.header.xy;
     float scale = u.style.x;
+    float strength = u.style.y;
     float2 point = v.uv * size;
     float2 displacement = 0;
     float coverage = 0;
@@ -79,10 +80,11 @@ fragment float4 liquid(Vertex v [[stage_in]],
     lighting += wakeLight * 0.065f;
     sunsetCrest = max(sunsetCrest, max(wakeLight, 0.0f));
     sunsetTrough = max(sunsetTrough, max(-wakeLight, 0.0f));
-    float alpha = smoothstep(0.005f, 0.22f, coverage) * 0.65f;
+    float alpha = smoothstep(0.005f, 0.22f, coverage) * min(0.9f, 0.65f * strength);
     if (alpha < 0.001f) return float4(0);
+    displacement *= strength;
     float length = metal::length(displacement);
-    displacement *= min(1.0f, 7.0f / max(length, 0.001f));
+    displacement *= min(1.0f, 7.0f * strength / max(length, 0.001f));
     float2 offset = displacement / size;
     // Wavelength-dependent sampling produces actual color separation of the
     // captured background, rather than a rainbow painted over a white ring.
@@ -100,8 +102,8 @@ fragment float4 liquid(Vertex v [[stage_in]],
         float3 film = 0.5f + 0.5f * cos(6.283185f * (phase + float3(0, 0.3333f, 0.6667f)));
         float crest = saturate(sunsetCrest + sunsetTrough);
         refracted = mix(centerColor, refracted, 0.8f);
-        refracted = mix(refracted, film, saturate(crest * 0.48f + coverage * 0.12f));
-        refracted += film * crest * 0.10f;
+        refracted = mix(refracted, film, saturate((crest * 0.48f + coverage * 0.12f) * strength));
+        refracted += film * crest * 0.10f * strength;
     }
     if (u.style.z > 2.5f) {
         constexpr float3 colors[6] = {
@@ -117,15 +119,15 @@ fragment float4 liquid(Vertex v [[stage_in]],
         uint index = uint(phase);
         float3 reflection = mix(colors[index], colors[(index + 1) % 6],
                                 smoothstep(0.0f, 1.0f, fract(phase)));
-        refracted = mix(refracted, reflection * 0.18f, sunsetTrough * 0.22f);
-        refracted = mix(refracted, reflection, sunsetCrest * 0.60f);
-        refracted += reflection * sunsetCrest * 0.045f;
+        refracted = mix(refracted, reflection * 0.18f, saturate(sunsetTrough * 0.22f * strength));
+        refracted = mix(refracted, reflection, saturate(sunsetCrest * 0.60f * strength));
+        refracted += reflection * sunsetCrest * 0.045f * strength;
     } else if (u.style.z > 1.5f) {
         // Sunset reflections: amber/coral crests above deep teal troughs.
         // Preserve the refracted desktop between those moving highlights.
-        refracted = mix(refracted, float3(0.025f, 0.18f, 0.23f), sunsetTrough * 0.20f);
-        refracted += float3(0.26f, 0.105f, -0.035f) * sunsetCrest;
+        refracted = mix(refracted, float3(0.025f, 0.18f, 0.23f), saturate(sunsetTrough * 0.20f * strength));
+        refracted += float3(0.26f, 0.105f, -0.035f) * sunsetCrest * strength;
     }
-    refracted = clamp(refracted + lighting * coverage, 0.0f, 1.0f);
+    refracted = clamp(refracted + lighting * coverage * strength, 0.0f, 1.0f);
     return float4(refracted * alpha, alpha); // Premultiplied alpha.
 }
